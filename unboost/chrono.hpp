@@ -597,7 +597,7 @@
             operator<=(const auto_duration& lhs, const auto_duration& rhs) {
                 return !(lhs > rhs);
             }
-
+            typedef duration<_int64_t, ratio<1, 1000000000> > nanoseconds;
             typedef duration<_int64_t, ratio<1, 1000000> > microseconds;
             typedef duration<_int64_t, ratio<1, 1000> >    milliseconds;
             typedef duration<_int64_t>                     seconds;
@@ -733,24 +733,52 @@
                 return TP(to_dur);
             }
 
-            // NOTE: epoch is 1970.01.01
-            #ifdef UNBOOST_USE_WIN32_CHRONO
-                inline long long _get_clock_time(void) {
+            namespace detail {
+                // NOTE: epoch is 1970.01.01
+#ifdef UNBOOST_USE_WIN32_CHRONO
+                inline time_point<_int64_t, ratio<1, 1000000000>> get_clock_time() {
                     FILETIME ft;
                     ::GetSystemTimeAsFileTime(&ft);
-                    return (static_cast<long long>(ft.dwHighDateTime) << 32) + ft.dwLowDateTime - 116444736000000000;
+                    return nanoseconds((static_cast<long long>(ft.dwHighDateTime) << 32) + ft.dwLowDateTime - 116444736000000000);
                 }
-            #elif defined(UNBOOST_USE_POSIX_CHRONO)
-                inline long long  _get_clock_time(void) {
-                    struct timeval tv;
-                    struct timezone tz;
-                    gettimeofday(&tv);
-                    return tv.tv_sec + tv.tv_usec;
+                inline time_point<_int64_t, ratio<1, 1000000000>> get_steady_time() {
+                    // doesn't change after system boot
+                    LARGE_INTEGER freq;
+                    QueryPerformanceCounter(&freq);	/* always succeeds */
+                    LARGE_INTEGER ctr;
+                    QueryPerformanceFrequency(&ctr);	/* always succeeds */
+                    UNBOOST_STATIC_ASSERT_MSG(nano::num == 1, "err");
+                    const long long whole = (ctr.QuadPart / freq.QuadPart) * nano::den;
+                    const long long part = (ctr.QuadPart % freq.QuadPart) * nano::den / freq.QuadPart;
+                    return nanoseconds(whole + part);
                 }
-            #else
-                #error You lose.
-            #endif
-
+                inline time_point<_int64_t, ratio<1, 1000000000>> get_high_time() {
+                    return get_steady_time();
+                }
+#elif defined(UNBOOST_USE_POSIX_CHRONO)
+                inline time_point<_int64_t, ratio<1, 1000000000>>  get_clock_time() {
+                    timeval tv;
+                    gettimeofday(&tv, 0);
+                    return seconds(tv.tv_sec) + microseconds(tv.tv_usec);
+                }
+                inline time_point<_int64_t, ratio<1, 1000000000>> get_steady_time() {
+                    struct timespec tp;
+                    //TODO:use system_error
+                    if (0 != clock_gettime(CLOCK_MONOTONIC, &tp))
+                        throw std::runtime_error("clock_gettime(CLOCK_MONOTONIC) failed");
+                    return seconds(tp.tv_sec) + nanoseconds(tp.tv_nsec);
+                }
+                inline time_point<_int64_t, ratio<1, 1000000000>> get_high_time() {
+#ifdef CLOCK_REALTIME
+                    return get_steady_time();
+#else
+                    return get_clock_time();
+#endif
+                }
+#else
+#	error You lose.
+#endif
+            }
             struct system_clock {
                 typedef chrono::microseconds    duration;
                 typedef duration::rep           rep;
@@ -760,7 +788,7 @@
                 enum { is_steady = 0 };
 
                 static time_point now() {
-                    time_point::duration d(_get_clock_time());
+                    time_point::duration d(detail::get_clock_time());
                     time_point tp(d);
                     return tp;
                 }
@@ -785,11 +813,25 @@
                 typedef chrono::time_point<steady_clock, duration> time_point;
                 typedef steady_clock self_type;
                 enum { is_steady = true };
-
                 static time_point now() {
-                    time_point::duration d(_get_clock_time());
-                    time_point tp(d);
-                    return tp;
+                     return detail::get_steady_time();
+                }
+            };
+            struct high_resolution_clock {
+                typedef chrono::microseconds    duration;
+                typedef duration::rep           rep;
+                typedef duration::period        period;
+                typedef chrono::time_point<high_resolution_clock, duration> time_point;
+                typedef high_resolution_clock self_type;
+                enum { 
+#if defined(UNBOOST_USE_WIN32_CHRONO) || (defined(UNBOOST_USE_POSIX_CHRONO) && defined(CLOCK_REALTIME))
+                    is_steady = true 
+#else
+                    is_steady = false
+#endif
+                };
+                static time_point now() {
+                    return detail::get_high_time();
                 }
             };
 
