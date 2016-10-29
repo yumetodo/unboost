@@ -16,6 +16,8 @@ cmake_install.cmake
 *.suo
 *.dir
 *.sdf
+*.VC.db
+*.opendb
 Debug
 Release
 x64
