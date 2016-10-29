@@ -47,7 +47,11 @@ namespace unboost {
         const error_code code() const { return m_code; }
         virtual const char *what() const {
             static char buf[32];
+#if defined(_MSC_VER) && 1400 <= _MSC_VER
+            ::sprintf_s(buf, "%d", code());
+#else
             std::sprintf(buf, "%d", code());
+#endif
             return buf;
         }
     protected:

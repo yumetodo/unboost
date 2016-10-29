@@ -17,7 +17,30 @@
     #include <unboost/chrono.hpp>
     #include <unboost/thread.hpp>
 #endif
+#if (defined(_MSC_VER) && _MSC_VER < 1000) || (defined(__MINGW__) && defined(__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9)))
+#ifndef EINVAL
+#define EINVAL 22
+#endif
+typedef int errno_t;// in gcc 4.9.2, defined at stdlib.h
 
+static errno_t gmtime_s(struct tm *_Tm, const time_t* _Time) {
+    if (NULL == _Tm || NULL == _Time) return EINVAL;
+    struct tm *temp = gmtime(_Time);
+    if (NULL == temp) return EINVAL;
+    *_Tm = *temp;
+    return 0;
+}
+#endif
+static std::ostream& operator<<(std::ostream& os, tm* t) {
+#if defined(_MSC_VER) && 1400 <= _MSC_VER
+    char buf[32];
+    ::asctime_s(buf, t);
+    os << buf;
+#else
+    os << std::asctime(t);
+#endif
+    return os;
+}
 int main(void) {
     std::cout << "chrono" << std::endl;
     {
@@ -315,10 +338,14 @@ int main(void) {
         p3 = p2 - hours(24);
 
         std::time_t epoch_time = system_clock::to_time_t(p1);
-        std::cout << "epoch: " << std::asctime(std::gmtime(&epoch_time));
+        tm epoch_t;
+        gmtime_s(&epoch_t, &epoch_time);
+        std::cout << "epoch: " << &epoch_t;
 
         std::time_t today_time = system_clock::to_time_t(p2);
-        std::cout << "today: " << std::asctime(std::gmtime(&today_time));
+        tm today_t;
+        gmtime_s(&today_t, &today_time);
+        std::cout << "today: " << &today_t;
 
         std::cout << "years since epoch: "
                   << duration_cast<years>(p2.time_since_epoch()).count()
@@ -331,6 +358,7 @@ int main(void) {
         using namespace unboost::chrono;
         time_point<system_clock> now = system_clock::now();
         std::vector<time_point<system_clock>> times;
+        times.reserve(3);
         times.push_back(now - hours(24));
         times.push_back(now - hours(48));
         times.push_back(now + hours(24));
@@ -339,15 +367,19 @@ int main(void) {
 
         std::cout << "all times:\n";
         for (const auto &time : times) {
-            std::time_t t = system_clock::to_time_t(time);
-            std::cout << std::asctime(std::gmtime(&t));
+            std::time_t ti = system_clock::to_time_t(time);
+            tm t;
+            gmtime_s(&t, &ti);
+            std::cout << &t;
 
             if (time < earliest) earliest = time;
         }
 
-        std::time_t t = system_clock::to_time_t(earliest);
+        std::time_t ti = system_clock::to_time_t(earliest);
+        tm t;
+        gmtime_s(&t, &ti);
         std::cout << "earliest:\n";
-        std::cout << std::asctime(std::gmtime(&t)) << std::endl;
+        std::cout << &t << std::endl;
     }
 
     std::cout << "success" << std::endl;
