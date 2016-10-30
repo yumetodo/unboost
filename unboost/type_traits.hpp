@@ -595,6 +595,13 @@
 
 #ifndef __WATCOMC__
 #ifndef UNBOOST_OLD_BORLAND
+		namespace detail {
+			template<size_t N>
+			struct size_t_constant {
+				enum { value = N };
+				operator size_t() const { return static_cast<size_t>(value); }
+			};
+		}
         template <typename T, size_t N = 0>
         struct extent {
             // integral_constant<std::size_t, 0>
@@ -603,18 +610,9 @@
             enum { value = 0 };
             operator value_type() const { return (value_type)value; }
         };
-        template <typename T, size_t N>
-        struct extent<T[N], 0> {
-            // integral_constant<std::size_t, N>
-            typedef size_t value_type;
-            typedef extent<T[N], 0> type;
-            enum { value = N };
-            operator value_type() const { return (value_type)value; }
-        };
         template <typename T, unsigned I, size_t N>
-        struct extent<T[I], N> : extent<T, N - 1> {
-            // integral_constant<std::size_t, std::extent<T, N-1>::value>
-        };
+        struct extent<T[I], N> : detail::size_t_constant<(0 == N) ? I : extent<T, N - 1>::value> {
+		};
 #ifndef UNBOOST_NO_EMPTY_ARRAY
         template <typename T>
         struct extent<T[], 0> {
