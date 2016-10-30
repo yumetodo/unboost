@@ -188,7 +188,7 @@
         using std::swap;
 
         #ifndef UNBOOST_CXX11
-            #if !(__cplusplus >= 201103L)    // not C++11
+            #if (__cplusplus < 201103L) && !defined(_MSC_VER) && !defined(__clang__)    // not C++11
                 template <typename T2, size_t N>
                 inline void swap(T2 (&a)[N], T2 (&b)[N]) {
                     std::swap_ranges(a, a + N, b);
