@@ -8,8 +8,8 @@
 #include "static_assert.hpp"
 
 namespace unboost {
-    typedef int _ratio_intmax_t;
-    typedef unsigned int _ratio_uintmax_t;
+    typedef long long _ratio_intmax_t;
+    typedef unsigned long long _ratio_uintmax_t;
 
     template <_ratio_intmax_t N>
     struct _SIGN {
