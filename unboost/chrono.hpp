@@ -106,6 +106,7 @@
     #include <cfloat>   // for FLT_MAX
     #include <ctime>    // for time_t
     #include <cmath>    // for std::fmod
+    #include "type_traits.hpp"
     #ifdef _WIN32
         #ifndef _INC_WINDOWS
             #ifndef NOMINMAX
@@ -140,27 +141,12 @@
             // _numeric_limits_lowest
             //
             template <class Rep>
-            inline Rep _numeric_limits_lowest() {
-                #ifdef UNBOOST_CXX11
-                    return std::numeric_limits<Rep>::lowest();
-                #else
-                    Rep r = (Rep)0.1;
-                    if ((int)r != 0) {
-                        if (sizeof(Rep) == sizeof(float)) {
-                            r = (Rep)FLT_MAX;
-                            return -r;
-                        }
-                        if (sizeof(Rep) == sizeof(double)) {
-                            r = (Rep)DBL_MAX;
-                            return -r;
-                        }
-                        if (sizeof(Rep) == sizeof(long double)) {
-                            r = (Rep)LDBL_MAX;
-                            return -r;
-                        }
-                    }
-                    return std::numeric_limits<Rep>::min();
-                #endif
+            inline typename enable_if<is_arithmetic<Rep>::value, Rep>::type _numeric_limits_lowest() {
+                return std::numeric_limits<Rep>::min();
+            } // _numeric_limits_lowest
+            template <class Rep>
+            inline typename enable_if<!is_arithmetic<Rep>::value, Rep>::type _numeric_limits_lowest() {
+                return -std::numeric_limits<Rep>::max();
             } // _numeric_limits_lowest
 
             //
